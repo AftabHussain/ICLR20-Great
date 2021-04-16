@@ -90,12 +90,16 @@ def train(data, config, model_path=None, log_path=None):
 			
 			# Every valid_interval samples, run an evaluation pass and store the most recent model with its heldout accuracy
 			if prev_samples // config["data"]["valid_interval"] < curr_samples // config["data"]["valid_interval"]:
-				avg_accs = evaluate(data, config, model)
-				tracker.save_checkpoint(model, avg_accs)
+				#avg_accs = evaluate(data, config, model)
+				#tracker.save_checkpoint(model, avg_accs)
 				if tracker.ckpt.step >= config["training"]["max_steps"]:
 					break
 				else:
 					print("Step:", tracker.ckpt.step.numpy() + 1)
+		print("Evaluating")
+		avg_accs = evaluate(data, config, model)
+		print("Saving")
+		tracker.save_checkpoint(model, avg_accs)
 
 def evaluate(data, config, model, is_heldout=True):  # Similar to train, just without gradient updates
 	if is_heldout:
