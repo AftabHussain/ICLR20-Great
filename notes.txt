@@ -1,0 +1,5 @@
+prefetch
+https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/data/ops/dataset_ops.py#L1141-L1167
+
+repeat
+https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/data/ops/dataset_ops.py#L1238-L1257
