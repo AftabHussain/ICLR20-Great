@@ -62,7 +62,7 @@ class DataLoader():
 			relations += [[rel[0] + 1, rel[2], rel[1]] for rel in relations]  # Add reverse edges
 			return relations
 		
-		tokens = [self.vocabulary.translate(t)[:self.config["max_token_length"]] for t in json_data["source_tokens"]]
+		tokens = [self.vocabulary.translate(t)[:self.config["max_token_length"]] for t in json_data["source_tokens"]] #this is where src tokens are encoded
 		edges = parse_edges(json_data["edges"])
 		error_location = json_data["error_location"]
 		repair_targets = json_data["repair_targets"]
