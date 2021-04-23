@@ -3,3 +3,6 @@ https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/data/ops/
 
 repeat
 https://github.com/tensorflow/tensorflow/blob/v2.4.1/tensorflow/python/data/ops/dataset_ops.py#L1238-L1257
+
+interleave
+https://www.tensorflow.org/api_docs/python/tf/data/Dataset#interleave
