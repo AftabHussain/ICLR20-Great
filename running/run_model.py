@@ -60,7 +60,7 @@ def train(data, config, model_path=None, log_path=None):
 		# These are just for console logging, not global counts
 		for batch in data.batcher(mode='train'):
 			mbs += 1
-			tokens, edges, error_loc, repair_targets, repair_candidates = batch
+			tokens, edges, error_loc, repair_targets, repair_candidates = batch[0]
 			token_mask = tf.clip_by_value(tf.reduce_sum(tokens, -1), 0, 1)
 			
 			with tf.GradientTape() as tape:
@@ -107,8 +107,13 @@ def evaluate(data, config, model, is_heldout=True):  # Similar to train, just wi
 	mbs = 0
 	for batch in data.batcher(mode='dev' if is_heldout else 'eval'):
 		mbs += 1
-		tokens, edges, error_loc, repair_targets, repair_candidates = batch		
+		tokens, edges, error_loc, repair_targets, repair_candidates = batch[0]		
 		token_mask = tf.clip_by_value(tf.reduce_sum(tokens, -1), 0, 1)
+		print("-----------------------------------------")
+		print("--THE BATCH--")
+		for json_sample in batch[1]:
+		  print (json_sample)
+		print("-----------------------------------------")
 		
 		pointer_preds = model(tokens, token_mask, edges, training=False)
 		ls, acs = model.get_loss(pointer_preds, token_mask, error_loc, repair_targets, repair_candidates)
