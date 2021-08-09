@@ -36,7 +36,7 @@ class Tracker(object):
 		return self.ckpt.samples.numpy()
 	
 	def save_checkpoint(self, model, scores):
-		self.ckpt.step.assign_add(1) # increment step count
+		self.ckpt.step.assign_add(1)
 		self.ckpt.time.assign_add(time.time() - self.time)
 		self.time = time.time()
 		

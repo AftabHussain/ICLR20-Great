@@ -34,8 +34,8 @@ class DataLoader():
 		dataset = tf.data.Dataset.list_files(data_path + '/*.txt*', shuffle=mode != 'eval', seed=42)
 		dataset = dataset.interleave(lambda x: tf.data.TextLineDataset(x).shuffle(buffer_size=1000) if mode == 'train' else tf.data.TextLineDataset(x), cycle_length=4, block_length=16)
 		dataset = dataset.prefetch(1)
-		#if mode == "train":
-		#	dataset = dataset.repeat()
+		if mode == "train":
+			dataset = dataset.repeat()
 		
 		# To batch similarly-sized sequences together, we need buffering support, which TF doesn't really have.
 		# Instead, turn the dataset into a generator, run it through our own buffering function, and return a
@@ -62,7 +62,7 @@ class DataLoader():
 			relations += [[rel[0] + 1, rel[2], rel[1]] for rel in relations]  # Add reverse edges
 			return relations
 		
-		tokens = [self.vocabulary.translate(t)[:self.config["max_token_length"]] for t in json_data["source_tokens"]] #this is where src tokens are encoded
+		tokens = [self.vocabulary.translate(t)[:self.config["max_token_length"]] for t in json_data["source_tokens"]]
 		edges = parse_edges(json_data["edges"])
 		error_location = json_data["error_location"]
 		repair_targets = json_data["repair_targets"]
