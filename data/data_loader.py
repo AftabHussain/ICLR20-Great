@@ -34,15 +34,17 @@ class DataLoader():
 		dataset = tf.data.Dataset.list_files(data_path + '/*.txt*', shuffle=mode != 'eval', seed=42)
 		dataset = dataset.interleave(lambda x: tf.data.TextLineDataset(x).shuffle(buffer_size=1000) if mode == 'train' else tf.data.TextLineDataset(x), cycle_length=4, block_length=16)
 		dataset = dataset.prefetch(1)
+		#print("the mode is:", mode)
 		if mode == "train":
 			dataset = dataset.repeat()
 		
 		# To batch similarly-sized sequences together, we need buffering support, which TF doesn't really have.
 		# Instead, turn the dataset into a generator, run it through our own buffering function, and return a
 		# dataset of batches from that function. Could probably be more efficient, PRs welcome :)
-		ds = tf.data.Dataset.from_generator(lambda mode: self.to_batch(dataset, mode), output_types=(tf.dtypes.int32, tf.dtypes.int32, tf.dtypes.int32, tf.dtypes.int32, tf.dtypes.int32), args=(mode,))
-		ds = ds.prefetch(1)
-		return ds
+		#ds = tf.data.Dataset.from_generator(lambda mode: self.to_batch(dataset, mode), output_types=(tf.dtypes.int32, tf.dtypes.int32, tf.dtypes.int32, tf.dtypes.int32, tf.dtypes.int32), args=(mode,))
+		#ds = ds.prefetch(1)
+		#return ds
+		return self.to_batch(dataset, mode)
 	
 	def get_data_path(self, mode):	
 		if mode == "train":
@@ -76,18 +78,26 @@ class DataLoader():
 			return len(sample[0])
 		
 		# Generates a batch with similarly-sized sequences for efficiency
-		def make_batch(buffer):
-			pivot = sample_len(random.choice(buffer))
-			buffer = sorted(buffer, key=lambda b: abs(sample_len(b) - pivot))
+		def make_batch(buffer, json_samples):
+			#pivot = sample_len(random.choice(buffer))
+			#buffer = sorted(buffer, key=lambda b: abs(sample_len(b) - pivot))
 			batch = []
+			batch_json = []
 			max_seq_len = 0
+			json_sample_idx = 0
 			for sample in buffer:
 				max_seq_len = max(max_seq_len, sample_len(sample))
 				if max_seq_len*(len(batch) + 1) > self.config['max_batch_size']:
 					break
+				#print("buffer size, json_samples size : ", len(buffer), len(json_samples))
 				batch.append(sample)
+				batch_json.append(json_samples[json_sample_idx])
+				json_sample_idx += 1
 			batch_dim = len(batch)
 			buffer = buffer[batch_dim:]
+			json_samples = json_samples[batch_dim:]
+			#print(len(batch_json), len(batch))
+			#print("checkk")
 			batch = list(zip(*batch))
 			
 			# Pad all tokens to max length using ragged tensors
@@ -110,24 +120,33 @@ class DataLoader():
 			repair_candidates = tf.concat(batch[4], axis=0)
 			repair_candidates = tf.stack([candidates_batches, repair_candidates], axis=1)
 			
-			return buffer, (token_tensor, edge_tensor, error_location, repair_targets, repair_candidates)
+			return buffer, (token_tensor, edge_tensor, error_location, repair_targets, repair_candidates), json_samples, batch_json
 	
 		# Keep samples in a buffer that is (ideally) much larger than the batch size to allow efficient batching
 		buffer = []
+		# For keeping track of the raw json_samples 
+		json_samples = []
 		num_samples = 0
 		for line in sample_generator:
 			json_sample = json.loads(line.numpy())
-			sample = self.to_sample(json_sample)
+			sample = self.to_sample(json_sample) # sample is now all numeric
+			#print("json sample after to sample:")
+			#print(sample)
 			if sample_len(sample) > self.config['max_sequence_length']:
 				continue
+			#print(json_sample)
+			#print("check json sample")
 			buffer.append(sample)
+			json_samples.append(json_sample)
 			num_samples += 1
 			if mode == 'dev' and num_samples >= self.config['max_valid_samples']:
 				break
 			if sum(sample_len(sample) for l in buffer) > self.config['max_buffer_size']*self.config['max_batch_size']:
-				buffer, batch = make_batch(buffer)
-				yield batch
+				#print("batch")
+				#print(buffer)
+				buffer, batch, json_samples, batch_json = make_batch(buffer, json_samples)
+				yield (batch, batch_json)
 		# Drain the buffer upon completion
 		while buffer:
-			buffer, batch = make_batch(buffer)
-			yield batch
+			buffer, batch, json_samples, batch_json = make_batch(buffer, json_samples)
+			yield (batch, batch_json)
