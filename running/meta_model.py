@@ -67,7 +67,7 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		predictions = tf.transpose(self.prediction(states), [0, 2, 1])  # Convert to [batch, 2, seq-length] for convenience.
 		return predictions
 	
-	@tf.function(input_signature=[tf.TensorSpec(shape=(None, 2, None), dtype=tf.float32), tf.TensorSpec(shape=(None, None), dtype=tf.int32), tf.TensorSpec(shape=(None,), dtype=tf.int32), tf.TensorSpec(shape=(None, None), dtype=tf.int32), tf.TensorSpec(shape=(None, None), dtype=tf.int32)])
+#	@tf.function(input_signature=[tf.TensorSpec(shape=(None, 2, None), dtype=tf.float32), tf.TensorSpec(shape=(None, None), dtype=tf.int32), tf.TensorSpec(shape=(None,), dtype=tf.int32), tf.TensorSpec(shape=(None, None), dtype=tf.int32), tf.TensorSpec(shape=(None, None), dtype=tf.int32)])
 	def get_loss(self, predictions, token_mask, error_locations, repair_targets, repair_candidates):
 		# Mask out infeasible tokens in the logits
 		seq_mask = tf.cast(token_mask, 'float32')
@@ -79,8 +79,10 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		# Localization loss is simply calculated with sparse CE
 		loc_predictions = predictions[:, 0]
 		loc_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(error_locations, loc_predictions)
+		print("Loss",loc_loss)
 		loc_loss = tf.reduce_mean(loc_loss)
 		loc_accs = tf.keras.metrics.sparse_categorical_accuracy(error_locations, loc_predictions)
+		print("Accuracies",loc_accs)
 		
 		# Store two metrics: the accuracy at predicting specifically the non-buggy samples correctly (to measure false alarm rate), and the accuracy at detecting the real bugs.
 		no_bug_pred_acc = tf.reduce_sum((1 - is_buggy) * loc_accs) / (1e-9 + tf.reduce_sum(1 - is_buggy))  # Take mean only on sequences without errors
