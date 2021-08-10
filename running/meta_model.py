@@ -79,10 +79,9 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		# Localization loss is simply calculated with sparse CE
 		loc_predictions = predictions[:, 0]
 		loc_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(error_locations, loc_predictions)
-		print("Loss",loc_loss)
+		print("Localization loss (per sample)\n",loc_loss)
 		loc_loss = tf.reduce_mean(loc_loss)
 		loc_accs = tf.keras.metrics.sparse_categorical_accuracy(error_locations, loc_predictions)
-		print("Accuracies",loc_accs)
 		
 		# Store two metrics: the accuracy at predicting specifically the non-buggy samples correctly (to measure false alarm rate), and the accuracy at detecting the real bugs.
 		no_bug_pred_acc = tf.reduce_sum((1 - is_buggy) * loc_accs) / (1e-9 + tf.reduce_sum(1 - is_buggy))  # Take mean only on sequences without errors
@@ -97,9 +96,12 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		# Aggregate probabilities at repair targets to get the sum total probability assigned to the correct variable name
 		target_mask = tf.scatter_nd(repair_targets, tf.ones(tf.shape(repair_targets)[0]), tf.shape(pointer_probs))
 		target_probs = tf.reduce_sum(target_mask * pointer_probs, -1)
+		print("Target probabilities (per sample)\n", target_probs)
 		
 		# The loss is only computed at buggy samples, using (negative) cross-entropy
+		target_loss_samples = -tf.math.log(target_probs + 1e-9)
 		target_loss = tf.reduce_sum(is_buggy * -tf.math.log(target_probs + 1e-9)) / (1e-9 + tf.reduce_sum(is_buggy))  # Only on errors
+		print("Target loss (per sample)\n", target_loss_samples)
 		
 		# To simplify the comparison, accuracy is computed as achieving >= 50% probability for the top guess
 		# (as opposed to the slightly more accurate, but hard to compute quickly, greatest probability among distinct variable names).
