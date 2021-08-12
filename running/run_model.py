@@ -63,11 +63,10 @@ def train(data, config, model_path=None, log_path=None):
 			tokens, edges, error_loc, repair_targets, repair_candidates = batch[0]
 			token_mask = tf.clip_by_value(tf.reduce_sum(tokens, -1), 0, 1)
 			
-			print("-----------------------------------------")
-			print("--THE BATCH--")
+			print("BATCH_START")
 			for json_sample in batch[1]:
 			  print (json_sample)
-			print("-----------------------------------------")
+			print("BATCH_END")
 
 			with tf.GradientTape() as tape:
 				pointer_preds = model(tokens, token_mask, edges, training=True)
@@ -115,14 +114,14 @@ def evaluate(data, config, model, is_heldout=True):  # Similar to train, just wi
 		mbs += 1
 		tokens, edges, error_loc, repair_targets, repair_candidates = batch[0]		
 		token_mask = tf.clip_by_value(tf.reduce_sum(tokens, -1), 0, 1)
-		print("-----------------------------------------")
-		print("--THE BATCH--")
+		print("BATCH_START")
 		for json_sample in batch[1]:
 		  print (json_sample)
-		print("-----------------------------------------")
+		print("BATCH_END")
 		
 		pointer_preds = model(tokens, token_mask, edges, training=False)
 		ls, acs = model.get_loss(pointer_preds, token_mask, error_loc, repair_targets, repair_candidates)
+		#print("-----------------------------------")
 		num_buggy = tf.reduce_sum(tf.clip_by_value(error_loc, 0, 1))
 		update_metrics(losses, accs, counts, token_mask, ls, acs, num_buggy)
 		if is_heldout and counts[0].result() > config['data']['max_valid_samples']:
