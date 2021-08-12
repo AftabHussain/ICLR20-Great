@@ -78,8 +78,14 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		
 		# Localization loss is simply calculated with sparse CE
 		loc_predictions = predictions[:, 0]
+		loc_probs = tf.nn.softmax(loc_predictions)
+		loc_probs_rows, loc_probs_cols = loc_probs.get_shape()
+		loc_probs_max = tf.reduce_max(loc_probs, axis=[1])
+		print("LOC_PROB_SAMP_START\n", loc_probs_max)
+		print("LOC_PROB_SAMP_END")
 		loc_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(error_locations, loc_predictions)
-		print("Localization loss (per sample)\n",loc_loss)
+		print("LOC_LOSS_SAMP_START\n",loc_loss)
+		print("LOC_LOSS_SAMP_END")
 		loc_loss = tf.reduce_mean(loc_loss)
 		loc_accs = tf.keras.metrics.sparse_categorical_accuracy(error_locations, loc_predictions)
 		
@@ -96,12 +102,14 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		# Aggregate probabilities at repair targets to get the sum total probability assigned to the correct variable name
 		target_mask = tf.scatter_nd(repair_targets, tf.ones(tf.shape(repair_targets)[0]), tf.shape(pointer_probs))
 		target_probs = tf.reduce_sum(target_mask * pointer_probs, -1)
-		print("Target probabilities (per sample)\n", target_probs)
+		print("TGT_PROB_SAMP_START\n", target_probs)
+		print("TGT_PROB_SAMP_END")
 		
 		# The loss is only computed at buggy samples, using (negative) cross-entropy
 		target_loss_samples = -tf.math.log(target_probs + 1e-9)
 		target_loss = tf.reduce_sum(is_buggy * -tf.math.log(target_probs + 1e-9)) / (1e-9 + tf.reduce_sum(is_buggy))  # Only on errors
-		print("Target loss (per sample)\n", target_loss_samples)
+		print("TGT_LOSS_SAMP_START\n", target_loss_samples)
+		print("TGT_LOSS_SAMP_END")
 		
 		# To simplify the comparison, accuracy is computed as achieving >= 50% probability for the top guess
 		# (as opposed to the slightly more accurate, but hard to compute quickly, greatest probability among distinct variable names).
