@@ -1,4 +1,5 @@
 import tensorflow as tf
+from output_util import * 
 
 from models import great_transformer, ggnn, rnn, util
 
@@ -7,6 +8,7 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		super(VarMisuseModel, self).__init__()
 		self.config = config
 		self.vocab_dim = vocab_dim
+	
 	
 	def build(self, _):
 		# These layers are always used; initialize with any given model's hidden_dim
@@ -68,7 +70,8 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		return predictions
 	
 #	@tf.function(input_signature=[tf.TensorSpec(shape=(None, 2, None), dtype=tf.float32), tf.TensorSpec(shape=(None, None), dtype=tf.int32), tf.TensorSpec(shape=(None,), dtype=tf.int32), tf.TensorSpec(shape=(None, None), dtype=tf.int32), tf.TensorSpec(shape=(None, None), dtype=tf.int32)])
-	def get_loss(self, predictions, token_mask, error_locations, repair_targets, repair_candidates):
+	def get_loss(self, predictions, token_mask, error_locations, repair_targets, repair_candidates, step_count):
+
 		# Mask out infeasible tokens in the logits
 		seq_mask = tf.cast(token_mask, 'float32')
 		predictions += (1.0 - tf.expand_dims(seq_mask, 1)) * tf.float32.min
@@ -81,14 +84,13 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		loc_probs = tf.nn.softmax(loc_predictions)
 		loc_probs_rows, loc_probs_cols = loc_probs.get_shape()
 		loc_probs_max = tf.reduce_max(loc_probs, axis=[1])
-		print("LOC_PROB_SAMP_START\n", loc_probs_max)
-		print("LOC_PROB_SAMP_END")
+		write_data("LOC_PROB_SAMP", loc_probs_max, step_count)
+
 		loc_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(error_locations, loc_predictions)
-		print("LOC_LOSS_SAMP_START\n",loc_loss)
-		print("LOC_LOSS_SAMP_END")
+		write_data("LOC_LOSS_SAMP", loc_loss, step_count)
 		loc_loss = tf.reduce_mean(loc_loss)
 		loc_accs = tf.keras.metrics.sparse_categorical_accuracy(error_locations, loc_predictions)
-		
+
 		# Store two metrics: the accuracy at predicting specifically the non-buggy samples correctly (to measure false alarm rate), and the accuracy at detecting the real bugs.
 		no_bug_pred_acc = tf.reduce_sum((1 - is_buggy) * loc_accs) / (1e-9 + tf.reduce_sum(1 - is_buggy))  # Take mean only on sequences without errors
 		bug_loc_acc = tf.reduce_sum(is_buggy * loc_accs) / (1e-9 + tf.reduce_sum(is_buggy))  # Only on errors
@@ -102,14 +104,12 @@ class VarMisuseModel(tf.keras.layers.Layer):
 		# Aggregate probabilities at repair targets to get the sum total probability assigned to the correct variable name
 		target_mask = tf.scatter_nd(repair_targets, tf.ones(tf.shape(repair_targets)[0]), tf.shape(pointer_probs))
 		target_probs = tf.reduce_sum(target_mask * pointer_probs, -1)
-		print("TGT_PROB_SAMP_START\n", target_probs)
-		print("TGT_PROB_SAMP_END")
+		write_data("TGT_PROB_SAMP", target_probs, step_count)
 		
 		# The loss is only computed at buggy samples, using (negative) cross-entropy
 		target_loss_samples = -tf.math.log(target_probs + 1e-9)
 		target_loss = tf.reduce_sum(is_buggy * -tf.math.log(target_probs + 1e-9)) / (1e-9 + tf.reduce_sum(is_buggy))  # Only on errors
-		print("TGT_LOSS_SAMP_START\n", target_loss_samples)
-		print("TGT_LOSS_SAMP_END")
+		write_data("TGT_LOSS_SAMP", target_loss_samples, step_count)
 		
 		# To simplify the comparison, accuracy is computed as achieving >= 50% probability for the top guess
 		# (as opposed to the slightly more accurate, but hard to compute quickly, greatest probability among distinct variable names).
