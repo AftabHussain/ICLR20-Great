@@ -25,6 +25,6 @@ data:
   max_valid_samples: 25000
   max_token_length: 10  # In terms of (BPE) sub-tokens.
 training:
-  max_steps: 100
+  max_steps: 50
   print_freq: 25
   learning_rate: 0.0001

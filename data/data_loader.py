@@ -33,7 +33,7 @@ class DataLoader():
 		data_path = self.get_data_path(mode)
 		dataset = tf.data.Dataset.list_files(data_path + '/*.txt*', shuffle=mode != 'eval', seed=42)
 		dataset = dataset.interleave(lambda x: tf.data.TextLineDataset(x).shuffle(buffer_size=1000) if mode == 'train' else tf.data.TextLineDataset(x), cycle_length=4, block_length=16)
-		dataset = dataset.prefetch(1)
+		dataset = dataset.prefetch(100)
 		if mode == "train":
 			dataset = dataset.repeat()
 		

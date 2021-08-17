@@ -5,3 +5,6 @@ bin/
 lib/
 tmp/
 pyvenv.cfg
+
+step_*_output.txt
+summary
