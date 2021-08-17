@@ -4,12 +4,16 @@ sys.path.append('.')
 import argparse
 import yaml
 
-import numpy as np
 import tensorflow as tf
+import numpy as np
 
 from checkpoint_tracker import Tracker
 from data import data_loader, vocabulary
 from meta_model import VarMisuseModel
+
+from output_util import *
+
+step_count=1
 
 def main():
 	ap = argparse.ArgumentParser()
@@ -52,6 +56,7 @@ def train(data, config, model_path=None, log_path=None):
 	if tracker.ckpt.step.numpy() > 0:
 		print("Restored from step:", tracker.ckpt.step.numpy() + 1)
 	else:
+		step_count = tracker.ckpt.step.numpy().item() + 1
 		print("Step:", tracker.ckpt.step.numpy() + 1)
 	
 	mbs = 0
@@ -63,14 +68,11 @@ def train(data, config, model_path=None, log_path=None):
 			tokens, edges, error_loc, repair_targets, repair_candidates = batch[0]
 			token_mask = tf.clip_by_value(tf.reduce_sum(tokens, -1), 0, 1)
 			
-			print("BATCH_START")
-			for json_sample in batch[1]:
-			  print (json_sample)
-			print("BATCH_END")
+			write_batch(batch[1], step_count)
 
 			with tf.GradientTape() as tape:
 				pointer_preds = model(tokens, token_mask, edges, training=True)
-				ls, acs = model.get_loss(pointer_preds, token_mask, error_loc, repair_targets, repair_candidates)
+				ls, acs = model.get_loss(pointer_preds, token_mask, error_loc, repair_targets, repair_candidates, step_count)
 				loc_loss, rep_loss = ls
 				loss = loc_loss + rep_loss
 
@@ -85,6 +87,7 @@ def train(data, config, model_path=None, log_path=None):
 			curr_samples = tracker.update_samples(samples)
 			update_metrics(losses, accs, counts, token_mask, ls, acs, num_buggy)
 		
+			'''
 			# Every few minibatches, print the recent training performance
 			if mbs % config["training"]["print_freq"] == 0:
 				avg_losses = ["{0:.3f}".format(l.result().numpy()) for l in losses]
@@ -92,15 +95,25 @@ def train(data, config, model_path=None, log_path=None):
 				print("MB: {0}, seqs: {1:,}, tokens: {2:,}, loss: {3}, accs: {4}".format(mbs, curr_samples, counts[1].result().numpy(), ", ".join(avg_losses), ", ".join(avg_accs)))
 				[l.reset_states() for l in losses]
 				[a.reset_states() for a in accs]
+			'''
 			
 			# Every valid_interval samples, run an evaluation pass and store the most recent model with its heldout accuracy
 			if prev_samples // config["data"]["valid_interval"] < curr_samples // config["data"]["valid_interval"]:
+				
+				# Print the training stats for this step before running evaluate
+				avg_accs = [a.result().numpy() for a in accs]
+				avg_accs_str = ", ".join(["{0:.2%}".format(a) for a in avg_accs])
+				avg_loss_str = ", ".join(["{0:.3f}".format(l.result().numpy()) for l in losses])
+				print("Training result: seqs: {0:,}, tokens: {1:,}, loss: {2}, accs: {3}".format(counts[0].result().numpy(), counts[1].result().numpy(), avg_loss_str, avg_accs_str))
+				
 				avg_accs = evaluate(data, config, model)
 				tracker.save_checkpoint(model, avg_accs)
 				if tracker.ckpt.step >= config["training"]["max_steps"]:
 					break
 				else:
+					step_count = tracker.ckpt.step.numpy().item() + 1
 					print("Step:", tracker.ckpt.step.numpy() + 1)
+	
 
 def evaluate(data, config, model, is_heldout=True):  # Similar to train, just without gradient updates
 	if is_heldout:
@@ -114,13 +127,10 @@ def evaluate(data, config, model, is_heldout=True):  # Similar to train, just wi
 		mbs += 1
 		tokens, edges, error_loc, repair_targets, repair_candidates = batch[0]		
 		token_mask = tf.clip_by_value(tf.reduce_sum(tokens, -1), 0, 1)
-		print("BATCH_START")
-		for json_sample in batch[1]:
-		  print (json_sample)
-		print("BATCH_END")
+		write_batch(batch[1], step_count)
 		
 		pointer_preds = model(tokens, token_mask, edges, training=False)
-		ls, acs = model.get_loss(pointer_preds, token_mask, error_loc, repair_targets, repair_candidates)
+		ls, acs = model.get_loss(pointer_preds, token_mask, error_loc, repair_targets, repair_candidates, step_count)
 		#print("-----------------------------------")
 		num_buggy = tf.reduce_sum(tf.clip_by_value(error_loc, 0, 1))
 		update_metrics(losses, accs, counts, token_mask, ls, acs, num_buggy)
